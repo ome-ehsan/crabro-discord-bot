@@ -1,4 +1,4 @@
-class ConversationMemory {
+class Memory {
   constructor() {
     this.conversations = new Map(); // userId to conversation history
     this.maxMessagesPerUser = 15; // last 15 msgs
@@ -160,4 +160,4 @@ class ConversationMemory {
 }
 
 
-export default ConversationMemory;
+export default Memory;

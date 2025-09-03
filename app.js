@@ -1,9 +1,6 @@
 import { Client, GatewayIntentBits, Events } from 'discord.js';
-import axios from 'axios';
 import dotenv from 'dotenv';
-import PERSONALITY_PROMPT from "./personality.js"
-
-
+import getAIResponse from './aiMethods';
 dotenv.config();
 
 // client instance
@@ -15,47 +12,8 @@ const client = new Client({
     GatewayIntentBits.DirectMessages
   ]
 });
-
 // Bot configuration
 const BOT_PREFIX = process.env.BOT_PREFIX || '!';
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-
-// OpenRouter API configuration
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-// Simple AI function
-async function getAIResponse(userMessage, userName = 'User') {
-  try {
-    const response = await axios.post(OPENROUTER_BASE_URL, {
-      model: "deepseek/deepseek-chat-v3.1:free", // Free model
-      messages: [
-        {
-          role: 'system',
-          content: PERSONALITY_PROMPT
-        },
-        {
-          role: 'user', 
-          content: `${userName} says: ${userMessage}`
-        }
-      ],
-      max_tokens: 300,
-      temperature: 0.7
-    }, {
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        // 'HTTP-Referer': 'https://github.com/your-username/ai-discord-bot', // Optional
-        // 'X-Title': 'AI Discord Bot' // Optional
-      }
-    });
-
-    return response.data.choices[0].message.content;
-  } catch (error) {
-    console.error('OpenRouter API Error:', error.response?.data || error.message);
-    return "Bruh, my head tweakin’ right now. Gimme a sec to get back right.";
-  }
-}
-
 // When the client is ready, run this code
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot is online! Logged in as ${c.user.tag}`);
@@ -65,25 +23,23 @@ client.once(Events.ClientReady, (c) => {
 
 // Listen for messages
 client.on(Events.MessageCreate, async (message) => {
-  // Ignore messages from bots (including itself)
+  // ignore messages from bots (including itself)
   if (message.author.bot) return;
-  
-  // Log all messages for debugging (remove in production)
+  // log all messages for debugging 
   console.log(`Message from ${message.author.tag}: ${message.content}`);
-  
+
+
   // Respond to mentions with AI
   if (message.mentions.has(client.user)) {
     try {
-      // Show typing indicator
+      // show typing indicator 
       await message.channel.sendTyping();
-      
       // Get AI response
       const aiResponse = await getAIResponse(
         message.content.replace(`<@${client.user.id}>`, '').trim(),
         message.author.displayName
       );
-      
-      // Split long responses if needed (Discord has 2000 char limit)
+      // split long responses if needed
       if (aiResponse.length > 1900) {
         const chunks = aiResponse.match(/.{1,1900}/g) || [aiResponse];
         for (const chunk of chunks) {
@@ -98,7 +54,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
     return;
   }
-  
+
   // Respond to prefix commands
   if (message.content.startsWith(BOT_PREFIX)) {
     const args = message.content.slice(BOT_PREFIX.length).trim().split(' ');
@@ -107,11 +63,11 @@ client.on(Events.MessageCreate, async (message) => {
     switch (command) {
       case 'ping':
         const ping = Date.now() - message.createdTimestamp;
-        await message.reply(`🏓 Pong! Latency: ${ping}ms`);
+        await message.reply(`Sup! Latency: ${ping}ms`);
         break;
         
       case 'hello':
-        await message.reply(`Hello ${message.author.displayName}! How can I assist you today?`);
+        await message.reply(`Ay ${message.author.displayName}! What u want?`);
         break;
         
       case 'ask':
@@ -139,22 +95,22 @@ client.on(Events.MessageCreate, async (message) => {
         }
         break;
       
-        case 'roast':
-          if (args.length === 0) {
-            await message.reply(`You want me to roast your ride? Tell me what you're driving: \`${BOT_PREFIX}roast <car name>\``);
-            return;
-          }
-          
-          try {
-            await message.channel.sendTyping();
-            const carToRoast = args.join(' ');
-            const roastResponse = await getAIResponse(`Roast this car and tell me everything wrong with it: ${carToRoast}`, message.author.displayName);
-            await message.reply(roastResponse);
-          } catch (error) {
-            console.error('Error with roast command:', error);
-            await message.reply("Bruh this bullshit ain't even worth roasting");
-          }
-          break;
+      case 'roast':
+        if (args.length === 0) {
+          await message.reply(`You want me to roast your ride? Tell me what you're driving: \`${BOT_PREFIX}roast <car name>\``);
+          return;
+        }
+        
+        try {
+          await message.channel.sendTyping();
+          const carToRoast = args.join(' ');
+          const roastResponse = await getAIResponse(`Roast this car and tell me everything wrong with it: ${carToRoast}`, message.author.displayName);
+          await message.reply(roastResponse);
+        } catch (error) {
+          console.error('Error with roast command:', error);
+          await message.reply("Bruh this bullshit ain't even worth roasting");
+        }
+        break;
         
       case 'suggest':
         if (args.length === 0) {
