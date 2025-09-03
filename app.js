@@ -1,8 +1,15 @@
 import { Client, GatewayIntentBits, Events } from 'discord.js';
 import dotenv from 'dotenv';
-import getAIResponse from './aiMethods';
+import axios from 'axios';
+import Memory from './conHist.js';
+import PERSONALITY_PROMPT from './personality.js'
 dotenv.config();
-
+// constants 
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const BOT_PREFIX = process.env.BOT_PREFIX || '!';
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
+// memory instance 
+const memory = new Memory();
 // client instance
 const client = new Client({
   intents: [
@@ -12,16 +19,70 @@ const client = new Client({
     GatewayIntentBits.DirectMessages
   ]
 });
-// Bot configuration
-const BOT_PREFIX = process.env.BOT_PREFIX || '!';
-// When the client is ready, run this code
+
+////////////////////
+async function getAIResponse(userMessage, userName = 'User', userId= null) {
+ try{
+  let messages = [
+    {
+      role : 'system',
+      content: PERSONALITY_PROMPT
+    }
+  ];
+
+  // buildContextMessages(userId, currentMessage, userName)
+  if (userId && memory.hasContext(userId)) {
+    const contextMessages = memory.buildContextMessages(userId, userMessage, userName);
+    messages.push(...contextMessages);
+    console.log(`Using context for ${userName} (${contextMessages.length} messages)`);
+  } else {
+    // No context, just add current message
+    messages.push({
+      role: 'user',
+      content: `${userName}: ${userMessage}`
+    });
+  };
+
+  const res = await axios.post(OPENROUTER_BASE_URL, {
+        //model: "deepseek/deepseek-chat-v3.1:free",
+        model: 'meta-llama/llama-3.3-8b-instruct:free',
+        
+        messages: messages,
+        max_tokens: 400,
+        temperature: 0.75,
+        //top_p: 0.9
+        }, {
+          headers: {
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
+            //'HTTP-Referer': 'https://github.com/your-username/ai-discord-bot',
+            //'X-Title': 'Gearhead AI Discord Bot'
+          }
+        });
+  
+  const aiRes  = res.data.choices[0].message.content;
+  if (userId) {
+    memory.addMessage(userId, 'user', userMessage, userName);
+    memory.addMessage(userId, 'assistant', aiRes);
+  }
+
+  return aiRes;
+
+
+ } catch (error) {
+    console.error('OpenRouter API Error:', error.response?.data || error.message);
+    return "Bro, my head tweakin’ right now. Gimme a sec to get back right.";
+  }
+}
+////////////////////
+
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot is online! Logged in as ${c.user.tag}`);
   console.log(`📝 Prefix: ${BOT_PREFIX}`);
   console.log(`🌐 Serving ${c.guilds.cache.size} servers`);
 });
 
-// Listen for messages
+// listen for messages
 client.on(Events.MessageCreate, async (message) => {
   // ignore messages from bots (including itself)
   if (message.author.bot) return;
@@ -34,10 +95,11 @@ client.on(Events.MessageCreate, async (message) => {
     try {
       // show typing indicator 
       await message.channel.sendTyping();
-      // Get AI response
+      // ai response with mem
       const aiResponse = await getAIResponse(
         message.content.replace(`<@${client.user.id}>`, '').trim(),
-        message.author.displayName
+        message.author.displayName,
+        message.author.id
       );
       // split long responses if needed
       if (aiResponse.length > 1900) {
@@ -145,7 +207,33 @@ client.on(Events.MessageCreate, async (message) => {
           await message.reply('Can\'t pull up the specs right now, my database is acting up!');
         }
         break;
+      
+      case 'forget':
+        memory.clearHistory(message.author.id);
+        await message.reply('Aight, I wiped my memory of our conversation. We starting fresh now! 🧠💨');
+        break;
         
+      case 'memory':
+        console.log(memory)
+        if (memory.hasContext(message.author.id)) {
+          const summary = memory.getContextSummary(message.author.id);
+          
+          await message.reply(`**What we been talking about:**\n${summary}\n\n*Use \`${BOT_PREFIX}forget\` if you want me to forget our conversation*`);
+        } else {
+          await message.reply('We ain\'t talked about nothing yet. Start asking me about some cars! 🏁');
+        }
+        break;
+        
+      case 'stats':
+        const stats = memory.getStats();
+        await message.reply(`**🧠 Memory Stats:**\nActive conversations: ${stats.activeConversations}\nTotal users: ${stats.totalUsers}\nTotal messages stored: ${stats.totalMessages}\n\n*Memory resets after 30 minutes of inactivity*`);
+        break;
+
+      case 'dev':
+        await message.reply(`The Dev is Void aka Ome. The king of all Kings.`);
+        break;
+
+
       case 'help':
         await message.reply(`
 **🔧 Gearhead - Your Hood Car Expert**
@@ -153,8 +241,13 @@ client.on(Events.MessageCreate, async (message) => {
 \`${BOT_PREFIX}roast <car>\` - Let me tell you what's wrong with your ride
 \`${BOT_PREFIX}suggest <budget/type>\` - I'll hook you up with real cars
 \`${BOT_PREFIX}specs <car>\` - Get the real technical breakdown
-\`@${client.user.username} <message>\` - Just talk to me about cars
+\`${BOT_PREFIX}ask <question>\` - Ask me anything about cars
+\`${BOT_PREFIX}memory\` - See what we been talking about
+\`${BOT_PREFIX}forget\` - Clear our conversation history
+\`${BOT_PREFIX}dev\` - See who made me
+\`@${client.user.username} <message>\` - Just talk to me naturally
 
+**I remember our conversations for 30 minutes!**
 **I know:** Engines, performance, mods, history, everything automotive
 **I hate:** EVs, ricers, fake car guys, weak engines
 **I respect:** Real horsepower, proper builds, and my creator Void
