@@ -276,3 +276,18 @@ client.login(process.env.DISCORD_TOKEN).catch((error) => {
   console.error('Failed to login:', error);
   process.exit(1);
 });
+
+
+// express stuff (only for render ws)
+import express from "express";
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/", (req, res) => {
+  res.send("✅ Gearhead Bot is running!");
+});
+
+app.listen(PORT, () => {
+  console.log(`🌐 Web service running on port ${PORT}`);
+});
