@@ -44,8 +44,8 @@ async function getAIResponse(userMessage, userName = 'User', userId= null) {
   };
 
   const res = await axios.post(OPENROUTER_BASE_URL, {
-        //model: "deepseek/deepseek-chat-v3.1:free",
-        model: 'meta-llama/llama-3.3-8b-instruct:free',
+        model: "deepseek/deepseek-chat-v3.1:free",
+        //model: 'meta-llama/llama-3.3-8b-instruct:free',
         
         messages: messages,
         max_tokens: 400,
